@@ -6,6 +6,7 @@ from typing import Iterable, List
 from rich.console import Group
 from rich.table import Table
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
@@ -116,6 +117,7 @@ class _HistoryApp(App):
         self.limit = limit
         self.detail_log: RichLog | None = None
         self._current_index = 0
+        self._column_widths: tuple[int, int, int] | None = None
         self.title = f"git history: {file_path}"
         self.sub_title = repo.path
 
@@ -136,6 +138,8 @@ class _HistoryApp(App):
             self.detail_log.write(Text("No commits found.", style="italic"))
             return
         self._select_index(0)
+        self._column_widths = None
+        self.call_after_refresh(self._refresh_current_commit)
         self.set_focus(self.detail_log)
 
     def action_prev_commit(self) -> None:
@@ -153,6 +157,10 @@ class _HistoryApp(App):
     def action_prompt_file(self) -> None:
         self.push_screen(FilePromptScreen(self.file_path), self._handle_file_selection)
 
+    def on_resize(self, event: events.Resize) -> None:
+        self._column_widths = None
+        self.call_after_refresh(self._refresh_current_commit)
+
     def _show_commit(self, commit: GitCommit, index: int) -> None:
         assert self.detail_log is not None
         total = len(self.commits)
@@ -161,10 +169,10 @@ class _HistoryApp(App):
         meta.append(f"Author: {commit.author_name} <{commit.author_email}>\n")
         meta.append(f"Date:   {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
         meta.append(f"File:   {self.file_path}\n")
-        meta.append(f"Show:   {total - index}/{total} commits\n\n")
+        meta.append(f"Show:   {total - index}/{total} commits\n")
 
         message = Text()
-        message.append("Message:\n", style="bold")
+        message.append("\nMessage:\n", style="bold")
         if commit.title:
             message.append(f"{commit.title}\n", style="italic")
         if commit.body.strip():
@@ -241,10 +249,19 @@ class _HistoryApp(App):
         elif self.screen and self.screen.size.width > 0:
             available = self.screen.size.width
         else:
+            if self._column_widths:
+                return self._column_widths
             available = 120
         usable = max(30, available - 6)
         third = max(10, usable // 3)
-        return third, third, third
+        widths = (third, third, third)
+        self._column_widths = widths
+        return widths
+
+    def _refresh_current_commit(self) -> None:
+        if not self.commits or self.detail_log is None:
+            return
+        self._show_commit(self.commits[self._current_index], self._current_index)
 
     def _select_index(self, index: int) -> None:
         if not self.commits:
@@ -277,6 +294,7 @@ class _HistoryApp(App):
         self.file_path = rel_path
         self.title = f"git history: {rel_path}"
         self._current_index = 0
+        self._column_widths = None
         self._select_index(0)
         self._show_status(f"Loaded {rel_path}", severity="information")
 

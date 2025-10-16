@@ -1,6 +1,6 @@
 [project]
 name = "ghist"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Textual-based terminal UI for browsing git history."
 authors = [{name = "pomber remake contributors"}]
 readme = "README.md"
