@@ -30,7 +30,7 @@ FilePromptScreen {
 FilePromptScreen #prompt-modal {
     width: 60%;
     max-width: 80;
-    height: 50%;
+    height: 25%;
     padding: 1 2;
     border: solid $accent 30%;
     background: $surface;
@@ -95,7 +95,7 @@ class _HistoryApp(App):
         Binding("q", "quit", "Quit"),
         Binding("left", "prev_commit", "Previous", key_display="←"),
         Binding("right", "next_commit", "Next", key_display="→"),
-        Binding("f", "prompt_file", "Change file", key_display="F"),
+        Binding("f", "prompt_file", "Select file", key_display="f"),
         Binding("tab", "focus_cycle", "Cycle focus", show=False),
     ]
 
