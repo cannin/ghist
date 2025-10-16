@@ -173,43 +173,78 @@ class _HistoryApp(App):
 
         parent = commit.parent_oids[0] if commit.parent_oids else None
         diff = self.repo.get_file_diff(commit.oid, self.file_path, parent)
-        diff_table = self._build_diff_table(diff.splitlines())
+        widths = self._compute_column_widths()
+        diff_table = self._build_diff_table(diff.splitlines(), widths)
         self.detail_log.clear()
         self.detail_log.write(Group(meta, message, diff_table))
         self.detail_log.scroll_home()
 
-    def _build_diff_table(self, lines: List[str]) -> Table:
+    def _build_diff_table(self, lines: List[str], widths: tuple[int, int, int]) -> Table:
+        removed_width, context_width, added_width = widths
         table = Table(
             show_header=True,
             header_style="bold",
             box=None,
             expand=True,
             pad_edge=False,
-            equal=True,
         )
-        table.add_column("Removed", style="red", ratio=1, no_wrap=False)
-        table.add_column("Context", ratio=1, no_wrap=False)
-        table.add_column("Added", style="green", ratio=1, no_wrap=False)
+        table.add_column(
+            "Removed",
+            style="red",
+            width=removed_width,
+            min_width=removed_width,
+            max_width=removed_width,
+            no_wrap=False,
+            overflow="fold",
+        )
+        table.add_column(
+            "Context",
+            width=context_width,
+            min_width=context_width,
+            max_width=context_width,
+            no_wrap=False,
+            overflow="fold",
+        )
+        table.add_column(
+            "Added",
+            style="green",
+            width=added_width,
+            min_width=added_width,
+            max_width=added_width,
+            no_wrap=False,
+            overflow="fold",
+        )
         for raw in lines:
             line = raw.rstrip("\n")
             if line.startswith("diff --git"):
-                table.add_row("", Text(line, style="cyan"), "")
+                table.add_row("", Text(line, style="cyan", overflow="fold"), "")
             elif line.startswith("@@"):
-                table.add_row("", Text(line, style="yellow"), "")
+                table.add_row("", Text(line, style="yellow", overflow="fold"), "")
             elif line.startswith("---"):
-                table.add_row(Text(line, style="red"), "", "")
+                table.add_row(Text(line, style="red", overflow="fold"), "", "")
             elif line.startswith("+++"):
-                table.add_row("", Text(line, style="green"), "")
+                table.add_row("", Text(line, style="green", overflow="fold"), "")
             elif line.startswith("-"):
-                table.add_row(Text(line, style="red"), "", "")
+                table.add_row(Text(line, style="red", overflow="fold"), "", "")
             elif line.startswith("+"):
-                table.add_row("", "", Text(line, style="green"))
+                table.add_row("", "", Text(line, style="green", overflow="fold"))
             elif line.startswith("index"):
-                table.add_row(Text(line, style="magenta"), "", "")
+                table.add_row(Text(line, style="magenta", overflow="fold"), "", "")
             else:
                 content = line[1:] if line.startswith(" ") else line
-                table.add_row("", Text(content), "")
+                table.add_row("", Text(content, overflow="fold"), "")
         return table
+
+    def _compute_column_widths(self) -> tuple[int, int, int]:
+        if self.detail_log and self.detail_log.size.width > 0:
+            available = self.detail_log.size.width
+        elif self.screen and self.screen.size.width > 0:
+            available = self.screen.size.width
+        else:
+            available = 120
+        usable = max(30, available - 6)
+        third = max(10, usable // 3)
+        return third, third, third
 
     def _select_index(self, index: int) -> None:
         if not self.commits:
