@@ -1,15 +1,15 @@
 # Git History TUI
 
-Interactive [Textual](https://github.com/Textualize/textual)-based interface for browsing git repositories, inspired by [pomber/git-history](https://github.com/pomber/git-history).
+Interactive [Textual](https://github.com/Textualize/textual)-based interface for exploring the history of a single file in a git repository, inspired by [pomber/git-history](https://github.com/pomber/git-history).
 
 ## Features
 
-- Displays recent commits with author and timestamp information.
+- Displays the commits that touched a given file with author and timestamp information.
 - Textual widgets with keyboard navigation: use `Left`/`Right` to step through commits and `Up`/`Down` to inspect the timeline.
 - View commit metadata, message body, and complete diff in the detail pane.
 - Page up/down, home/end shortcuts for faster navigation.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
-- Side-by-side diff visualization that keeps removed lines on the left, resulting file content in the center, and incoming additions on the right.
+- Side-by-side diff visualization with deleted lines in red (left), context in the middle, and inserted lines in green (right).
 
 ## Installation
 
@@ -23,11 +23,19 @@ pip install -e .
 
 ## Usage
 
+Preferred quick-run (no install needed) using [uv](https://github.com/astral-sh/uv):
+
 ```bash
-githistory-tui path/to/git/repo
+uv run python -m githistory_tui path/to/git/repo/README.md
 ```
 
-The path must point to a directory that contains a `.git` folder (or pass nothing to target the current directory). Optional flags:
+If you have already installed the project (or prefer the console script), you can run:
+
+```bash
+githistory-tui path/to/git/repo/README.md
+```
+
+The path must point to a tracked file inside a git repository. Optional flags:
 
 - `--limit`: number of commits to load (defaults to 256).
 
@@ -40,10 +48,6 @@ Inside the interface:
 
 ## Development
 
-Use `python -m githistory_tui /path/to/repo` during development without installing; just make sure `src/` is on `PYTHONPATH` and that `textual` is available:
-
-```bash
-PYTHONPATH=src python -m githistory_tui /path/to/repo
-```
+Use `uv run python -m githistory_tui /absolute/path/to/file` during development for an isolated environment with dependencies resolved automatically.
 
 The Textual UI works best in terminals that support basic color.
