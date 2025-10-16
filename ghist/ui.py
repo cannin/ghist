@@ -30,7 +30,7 @@ FilePromptScreen {
 FilePromptScreen #prompt-modal {
     width: 60%;
     max-width: 80;
-    height: 25%;
+    height: 50%;
     padding: 1 2;
     border: solid $accent 30%;
     background: $surface;
@@ -185,10 +185,11 @@ class _HistoryApp(App):
             box=None,
             expand=True,
             pad_edge=False,
+            equal=True,
         )
-        table.add_column("Removed", style="red", ratio=1)
-        table.add_column("Context", ratio=1)
-        table.add_column("Added", style="green", ratio=1)
+        table.add_column("Removed", style="red", ratio=1, no_wrap=False)
+        table.add_column("Context", ratio=1, no_wrap=False)
+        table.add_column("Added", style="green", ratio=1, no_wrap=False)
         for raw in lines:
             line = raw.rstrip("\n")
             if line.startswith("diff --git"):

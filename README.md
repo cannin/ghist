@@ -1,4 +1,4 @@
-# Git History TUI
+# ghist
 
 Interactive [Textual](https://github.com/Textualize/textual)-based interface for exploring the history of a single file in a git repository, inspired by [pomber/git-history](https://github.com/pomber/git-history).
 
@@ -22,18 +22,30 @@ python -m venv .venv
 pip install -e .
 ```
 
+Or install a global `ghist` command with [`uv tool`](https://docs.astral.sh/uv/concepts/tools/):
+
+```bash
+uv tool install --from "/path/to/ghist" ghist
+```
+
+Uninstall with:
+
+```bash
+uv tool uninstall ghist
+```
+
 ## Usage
 
 Preferred quick-run (no install needed) using [uv](https://github.com/astral-sh/uv):
 
 ```bash
-uv run python -m githistory_tui path/to/git/repo/README.md
+uv run python -m ghist path/to/git/repo/README.md
 ```
 
 If you have already installed the project (or prefer the console script), you can run:
 
 ```bash
-githistory-tui path/to/git/repo/README.md
+ghist path/to/git/repo/README.md
 ```
 
 The path must point to a tracked file inside a git repository. Optional flags:
@@ -50,6 +62,6 @@ Inside the interface:
 
 ## Development
 
-Use `uv run python -m githistory_tui /absolute/path/to/file` during development for an isolated environment with dependencies resolved automatically.
+Use `uv run python -m ghist /absolute/path/to/file` during development for an isolated environment with dependencies resolved automatically.
 
 The Textual UI works best in terminals that support basic color.
