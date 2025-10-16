@@ -141,13 +141,13 @@ class _HistoryApp(App):
     def action_prev_commit(self) -> None:
         if not self.commits:
             return
-        new_index = max(0, self._current_index - 1)
+        new_index = min(len(self.commits) - 1, self._current_index + 1)
         self._select_index(new_index)
 
     def action_next_commit(self) -> None:
         if not self.commits:
             return
-        new_index = min(len(self.commits) - 1, self._current_index + 1)
+        new_index = max(0, self._current_index - 1)
         self._select_index(new_index)
 
     def action_prompt_file(self) -> None:
@@ -161,7 +161,7 @@ class _HistoryApp(App):
         meta.append(f"Author: {commit.author_name} <{commit.author_email}>\n")
         meta.append(f"Date:   {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
         meta.append(f"File:   {self.file_path}\n")
-        meta.append(f"Show:   {index + 1}/{total} commits\n\n")
+        meta.append(f"Show:   {total - index}/{total} commits\n\n")
 
         message = Text()
         message.append("Message:\n", style="bold")
