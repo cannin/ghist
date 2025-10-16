@@ -5,7 +5,7 @@ Interactive terminal interface for browsing git repositories, inspired by [pombe
 ## Features
 
 - Displays recent commits with author and timestamp information.
-- Arrow key navigation: use `↑` `↓` to move through commits and `←` `→` to switch focus between the commit list and details panel.
+- Arrow key navigation: use `Up`/`Down` to move through commits and `Left`/`Right` to switch focus between the commit list and details panel.
 - View commit metadata, message body, and complete diff in the detail pane.
 - Page up/down, home/end shortcuts for faster navigation.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
@@ -33,8 +33,8 @@ Options:
 
 Inside the interface:
 
-- `←` `→`: move focus between commit list and details.
-- `↑` `↓`: move selection (list) or scroll (details).
+- `Left` / `Right`: move focus between commit list and details.
+- `Up` / `Down`: move selection (list) or scroll (details).
 - `PgUp` `PgDn`: page navigation.
 - `Home` / `End` or `g` / `G`: jump to start/end of the list.
 - `q`: quit.
