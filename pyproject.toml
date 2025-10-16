@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "githistory-tui"
+version = "0.1.0"
+description = "A curses-based terminal UI for browsing git history."
+authors = [{name = "pomber remake contributors"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+githistory-tui = "githistory_tui.app:main"
+
+[tool.setuptools]
+packages = {find = {where = ["src"]}}
+
+[tool.setuptools.package-dir]
+"" = "src"
