@@ -23,12 +23,11 @@ pip install -e .
 ## Usage
 
 ```bash
-githistory-tui --repo path/to/git/repo
+githistory-tui path/to/git/repo
 ```
 
-Options:
+The path must point to a directory that contains a `.git` folder (or pass nothing to target the current directory). Optional flags:
 
-- `--repo`: path to the target repository (defaults to current directory).
 - `--limit`: number of commits to load (defaults to 256).
 
 Inside the interface:
@@ -41,10 +40,10 @@ Inside the interface:
 
 ## Development
 
-Use `python -m githistory_tui --repo .` during development without installing; just make sure `src/` is on `PYTHONPATH`:
+Use `python -m githistory_tui /path/to/repo` during development without installing; just make sure `src/` is on `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=src python -m githistory_tui --repo /path/to/repo
+PYTHONPATH=src python -m githistory_tui /path/to/repo
 ```
 
 The curses UI works best in terminals that support basic color.

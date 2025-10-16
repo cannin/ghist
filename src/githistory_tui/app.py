@@ -15,9 +15,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         description="Navigate git history using an interactive terminal UI.",
     )
     parser.add_argument(
-        "--repo",
+        "repo",
+        nargs="?",
         default=".",
-        help="Path to the git repository (default: current directory)",
+        help="Path to the git repository root (must contain .git). Defaults to current directory.",
     )
     parser.add_argument(
         "--limit",
@@ -31,6 +32,15 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     path = os.path.abspath(args.repo)
+    if os.path.basename(path) == ".git":
+        path = os.path.dirname(path)
+    git_dir = os.path.join(path, ".git")
+    if not os.path.isdir(path):
+        print(f"error: repository path does not exist: {path}", file=sys.stderr)
+        return 1
+    if not os.path.isdir(git_dir):
+        print(f"error: expected '.git' directory inside {path}", file=sys.stderr)
+        return 1
     limit = max(1, args.limit)
     try:
         repo = GitRepository(path)
