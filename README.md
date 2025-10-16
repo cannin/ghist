@@ -1,0 +1,50 @@
+# Git History TUI
+
+Interactive terminal interface for browsing git repositories, inspired by [pomber/git-history](https://github.com/pomber/git-history).
+
+## Features
+
+- Displays recent commits with author and timestamp information.
+- Arrow key navigation: use `↑` `↓` to move through commits and `←` `→` to switch focus between the commit list and details panel.
+- View commit metadata, message body, and complete diff in the detail pane.
+- Page up/down, home/end shortcuts for faster navigation.
+- No avatars, no animations — just a fast, keyboard-driven TUI.
+
+## Installation
+
+The project uses a standard `pyproject.toml` (`setuptools` based). You can run it in-place or install it in an isolated environment:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -e .
+```
+
+## Usage
+
+```bash
+githistory-tui --repo path/to/git/repo
+```
+
+Options:
+
+- `--repo`: path to the target repository (defaults to current directory).
+- `--limit`: number of commits to load (defaults to 256).
+
+Inside the interface:
+
+- `←` `→`: move focus between commit list and details.
+- `↑` `↓`: move selection (list) or scroll (details).
+- `PgUp` `PgDn`: page navigation.
+- `Home` / `End` or `g` / `G`: jump to start/end of the list.
+- `q`: quit.
+
+## Development
+
+Use `python -m githistory_tui --repo .` during development without installing; just make sure `src/` is on `PYTHONPATH`:
+
+```bash
+PYTHONPATH=src python -m githistory_tui --repo /path/to/repo
+```
+
+The curses UI works best in terminals that support basic color.
