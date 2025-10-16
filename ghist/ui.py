@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from typing import Iterable, List
 
 from rich.console import Group
-from rich.table import Table
 from rich.text import Text
 from textual import events
 from textual.app import App, ComposeResult
@@ -13,7 +13,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, RichLog, Static
 
-from .git_data import GitCommit, GitRepository
+from .git_data import GitCommit, GitRepository, GitError
 
 
 DEFAULT_CSS = """
@@ -117,7 +117,6 @@ class _HistoryApp(App):
         self.limit = limit
         self.detail_log: RichLog | None = None
         self._current_index = 0
-        self._column_widths: tuple[int, int, int] | None = None
         self.title = f"git history: {file_path}"
         self.sub_title = repo.path
 
@@ -138,7 +137,6 @@ class _HistoryApp(App):
             self.detail_log.write(Text("No commits found.", style="italic"))
             return
         self._select_index(0)
-        self._column_widths = None
         self.call_after_refresh(self._refresh_current_commit)
         self.set_focus(self.detail_log)
 
@@ -158,7 +156,6 @@ class _HistoryApp(App):
         self.push_screen(FilePromptScreen(self.file_path), self._handle_file_selection)
 
     def on_resize(self, event: events.Resize) -> None:
-        self._column_widths = None
         self.call_after_refresh(self._refresh_current_commit)
 
     def _show_commit(self, commit: GitCommit, index: int) -> None:
@@ -179,84 +176,98 @@ class _HistoryApp(App):
             message.append(commit.body.rstrip() + "\n")
         message.append("\n")
 
-        parent = commit.parent_oids[0] if commit.parent_oids else None
-        diff = self.repo.get_file_diff(commit.oid, self.file_path, parent)
-        widths = self._compute_column_widths()
-        diff_table = self._build_diff_table(diff.splitlines(), widths)
+        (
+            file_lines,
+            file_error,
+            add_count,
+            del_count,
+            added_lines,
+            removed_before,
+        ) = self._prepare_context(commit)
+        context = self._build_context_text(
+            file_lines, file_error, add_count, del_count, added_lines, removed_before
+        )
         self.detail_log.clear()
-        self.detail_log.write(Group(meta, message, diff_table))
+        self.detail_log.write(Group(meta, message, context))
         self.detail_log.scroll_home()
 
-    def _build_diff_table(self, lines: List[str], widths: tuple[int, int, int]) -> Table:
-        removed_width, context_width, added_width = widths
-        table = Table(
-            show_header=True,
-            header_style="bold",
-            box=None,
-            expand=True,
-            pad_edge=False,
-        )
-        table.add_column(
-            "Removed",
-            style="red",
-            width=removed_width,
-            min_width=removed_width,
-            max_width=removed_width,
-            no_wrap=False,
-            overflow="fold",
-        )
-        table.add_column(
-            "Context",
-            width=context_width,
-            min_width=context_width,
-            max_width=context_width,
-            no_wrap=False,
-            overflow="fold",
-        )
-        table.add_column(
-            "Added",
-            style="green",
-            width=added_width,
-            min_width=added_width,
-            max_width=added_width,
-            no_wrap=False,
-            overflow="fold",
-        )
-        for raw in lines:
-            line = raw.rstrip("\n")
-            if line.startswith("diff --git"):
-                table.add_row("", Text(line, style="cyan", overflow="fold"), "")
-            elif line.startswith("@@"):
-                table.add_row("", Text(line, style="yellow", overflow="fold"), "")
-            elif line.startswith("---"):
-                table.add_row(Text(line, style="red", overflow="fold"), "", "")
-            elif line.startswith("+++"):
-                table.add_row("", Text(line, style="green", overflow="fold"), "")
-            elif line.startswith("-"):
-                table.add_row(Text(line, style="red", overflow="fold"), "", "")
+    def _prepare_context(
+        self, commit: GitCommit
+    ) -> tuple[List[str], str | None, int, int, set[int], dict[int, List[tuple[int, str]]]]:
+        try:
+            file_text = self.repo.get_file_contents(commit.oid, self.file_path)
+            file_lines = file_text.splitlines()
+            file_error: str | None = None
+        except GitError as err:
+            file_lines = []
+            file_error = str(err)
+        parent = commit.parent_oids[0] if commit.parent_oids else None
+        diff_lines = self.repo.get_file_diff(commit.oid, self.file_path, parent).splitlines()
+        added_lines: set[int] = set()
+        removed_before: dict[int, List[tuple[int, str]]] = defaultdict(list)
+        add_count = del_count = 0
+        current_old = current_new = 0
+        for line in diff_lines:
+            if line.startswith("@@"):
+                try:
+                    header = line.split("@@")[1].strip()
+                    old_part, new_part = header.split(" ")
+                except ValueError:
+                    old_part, new_part = "-1,0", "+1,0"
+                old_start = int(old_part.split(",")[0].replace("-", ""))
+                new_start = int(new_part.split(",")[0].replace("+", ""))
+                current_old = old_start
+                current_new = new_start
+                continue
+            if line.startswith("diff ") or line.startswith("index"):
+                continue
+            if line.startswith("---") or line.startswith("+++"):
+                continue
+            if line.startswith("-"):
+                key = current_new if current_new else 1
+                removed_before[key].append((current_old, line[1:]))
+                current_old += 1
+                del_count += 1
             elif line.startswith("+"):
-                table.add_row("", "", Text(line, style="green", overflow="fold"))
-            elif line.startswith("index"):
-                table.add_row(Text(line, style="magenta", overflow="fold"), "", "")
+                key = current_new if current_new else 1
+                added_lines.add(key)
+                current_new += 1
+                add_count += 1
+            elif line.startswith(" "):
+                current_old += 1
+                current_new += 1
+        return file_lines, file_error, add_count, del_count, added_lines, removed_before
+    def _build_context_text(
+        self,
+        file_lines: List[str],
+        file_error: str | None,
+        add_count: int,
+        del_count: int,
+        added_lines: set[int],
+        removed_before: dict[int, List[tuple[int, str]]],
+    ) -> Text:
+        text = Text()
+        text.append(f"Edited {self.file_path} (+{add_count} -{del_count})\n", style="bold")
+        text.append("\n")
+        if file_error:
+            text.append("Unable to load current file:\n", style="bold red")
+            text.append(f"{file_error}\n")
+            return text
+        final_key = len(file_lines) + 1
+        for line_no in range(1, len(file_lines) + 1):
+            for old_line, removed_text in removed_before.pop(line_no, []):
+                text.append(f"{old_line:5d} -{removed_text}\n", style="red")
+            line_text = file_lines[line_no - 1]
+            if line_no in added_lines:
+                text.append(f"{line_no:5d} +{line_text}\n", style="green")
             else:
-                content = line[1:] if line.startswith(" ") else line
-                table.add_row("", Text(content, overflow="fold"), "")
-        return table
-
-    def _compute_column_widths(self) -> tuple[int, int, int]:
-        if self.detail_log and self.detail_log.size.width > 0:
-            available = self.detail_log.size.width
-        elif self.screen and self.screen.size.width > 0:
-            available = self.screen.size.width
-        else:
-            if self._column_widths:
-                return self._column_widths
-            available = 120
-        usable = max(30, available - 6)
-        third = max(10, usable // 3)
-        widths = (third, third, third)
-        self._column_widths = widths
-        return widths
+                text.append(f"{line_no:5d}  {line_text}\n")
+        for old_line, removed_text in removed_before.pop(final_key, []):
+            text.append(f"{old_line:5d} -{removed_text}\n", style="red")
+        for remaining in removed_before.values():
+            for old_line, removed_text in remaining:
+                text.append(f"{old_line:5d} -{removed_text}\n", style="red")
+        return text
 
     def _refresh_current_commit(self) -> None:
         if not self.commits or self.detail_log is None:
@@ -294,7 +305,6 @@ class _HistoryApp(App):
         self.file_path = rel_path
         self.title = f"git history: {rel_path}"
         self._current_index = 0
-        self._column_widths = None
         self._select_index(0)
         self._show_status(f"Loaded {rel_path}", severity="information")
 

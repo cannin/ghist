@@ -97,6 +97,12 @@ class GitRepository:
         result = self._run(*args)
         return result.stdout
 
+    @lru_cache(maxsize=256)
+    def get_file_contents(self, oid: str, file_path: str) -> str:
+        """Return the file contents at a specific commit."""
+        result = self._run("show", f"{oid}:{file_path}")
+        return result.stdout
+
 
 def iter_walker(commits: Iterable[GitCommit]) -> Iterable[GitCommit]:
     """Yield commits preserving input order; helper for typing clarity."""

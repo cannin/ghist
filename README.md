@@ -1,4 +1,4 @@
-# ghist (Git History)
+# ghist (Git History Viewer)
 
 Interactive [Textual](https://github.com/Textualize/textual)-based interface for exploring the history of a single file in a git repository, inspired by [pomber/git-history](https://github.com/pomber/git-history).
 
@@ -9,7 +9,7 @@ Interactive [Textual](https://github.com/Textualize/textual)-based interface for
 - View commit metadata, message body, and complete diff in the detail pane.
 - Page up/down, home/end shortcuts for faster navigation.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
-- Side-by-side diff visualization with deleted lines in red (left), context in the middle, and inserted lines in green (right).
+- Inline diff view with the full file visible: removed lines in red, additions in green.
 - Change files on the fly by pressing `F` and typing a new path.
 
 ## Installation
