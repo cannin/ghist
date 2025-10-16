@@ -1,4 +1,4 @@
-# ghist
+# ghist (Git History)
 
 Interactive [Textual](https://github.com/Textualize/textual)-based interface for exploring the history of a single file in a git repository, inspired by [pomber/git-history](https://github.com/pomber/git-history).
 
