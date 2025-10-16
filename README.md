@@ -5,7 +5,7 @@ Interactive [Textual](https://github.com/Textualize/textual)-based interface for
 ## Features
 
 - Displays the commits that touched a given file with author and timestamp information.
-- Textual widgets with keyboard navigation: use `Left`/`Right` to step through commits and `Up`/`Down` to inspect the timeline.
+- Textual widgets with keyboard navigation: use `Left`/`Right` to step through commits and `Up`/`Down` to scroll the diff.
 - View commit metadata, message body, and complete diff in the detail pane.
 - Page up/down, home/end shortcuts for faster navigation.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
@@ -41,7 +41,7 @@ The path must point to a tracked file inside a git repository. Optional flags:
 
 Inside the interface:
 - `Left` / `Right`: move to the previous or next commit.
-- `Up` / `Down`: move within the commit list (when focused) or scroll the detail view.
+- `Up` / `Down`: scroll the detail view.
 - `PgUp` `PgDn`: page navigation.
 - `Home` / `End` or `g` / `G`: jump to start/end of the list.
 - `q`: quit.
