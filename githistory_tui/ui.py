@@ -30,6 +30,7 @@ FilePromptScreen {
 FilePromptScreen #prompt-modal {
     width: 60%;
     max-width: 80;
+    height: 50%;
     padding: 1 2;
     border: solid $accent 30%;
     background: $surface;
@@ -66,7 +67,7 @@ class FilePromptScreen(ModalScreen[str | None]):
                 file_input.styles.margin_top = 0  # gap handles spacing
                 yield file_input
                 with Horizontal(classes="prompt-buttons") as buttons:
-                    buttons.styles.align_horizontal = "right"
+                    buttons.styles.align_horizontal = "center"
                     buttons.styles.gap = 1
                     buttons.styles.margin_top = 1
                     yield Button("Cancel", id="cancel")
