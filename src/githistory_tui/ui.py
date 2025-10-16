@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
+from rich.console import Group
+from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Footer, Header, ListItem, ListView, Static, TextLog
+from textual.widgets import Footer, Header, ListItem, ListView, ScrollView, Static
 
 from .git_data import GitCommit, GitRepository
 
@@ -42,6 +44,7 @@ Screen {
 }
 #commit-detail {
     padding: 0 1;
+    height: 1fr;
 }
 """
 
@@ -70,8 +73,9 @@ class _HistoryApp(App):
     CSS = DEFAULT_CSS
     BINDINGS = [
         Binding("q", "quit", "Quit"),
-        Binding("left", "focus_list", "Focus list"),
-        Binding("right", "focus_detail", "Focus detail"),
+        Binding("left", "prev_commit", "Previous", key_display="←"),
+        Binding("right", "next_commit", "Next", key_display="→"),
+        Binding("tab", "focus_cycle", "Cycle focus", show=False),
     ]
 
     def __init__(self, repo: GitRepository, commits: Iterable[GitCommit]) -> None:
@@ -79,79 +83,126 @@ class _HistoryApp(App):
         self.repo = repo
         self.commits: List[GitCommit] = list(commits)
         self.list_view: ListView | None = None
-        self.detail_log: TextLog | None = None
+        self.detail_view: ScrollView | None = None
+        self._current_index = 0
 
     def compose(self) -> ComposeResult:
         self.list_view = ListView(id="commit-list")
-        self.detail_log = TextLog(
-            id="commit-detail",
-            highlight=True,
-            wrap=False,
-            auto_scroll=False,
-        )
+        self.detail_view = ScrollView(id="commit-detail", auto_width=True)
         yield Header(show_clock=False)
         yield Horizontal(
             Container(self.list_view, id="list-panel"),
-            Container(self.detail_log, id="detail-panel"),
+            Container(self.detail_view, id="detail-panel"),
             id="body",
         )
         yield Footer()
 
     def on_mount(self) -> None:
         assert self.list_view is not None
-        assert self.detail_log is not None
+        assert self.detail_view is not None
         if not self.commits:
-            self.detail_log.write("No commits found.")
+            self.detail_view.update(Text("No commits found.", style="italic"))
             return
         for commit in self.commits:
             self.list_view.append(CommitListItem(commit))
-        self.list_view.index = 0
-        self._show_commit(self.commits[0])
+        self._select_index(0)
         self.set_focus(self.list_view)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         item = event.item
         if isinstance(item, CommitListItem):
-            self._show_commit(item.commit)
+            index = self.list_view.index if self.list_view else 0
+            self._select_index(index)
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         item = event.item
         if isinstance(item, CommitListItem):
-            self._show_commit(item.commit)
+            index = self.list_view.index if self.list_view else 0
+            self._select_index(index)
 
-    def action_focus_list(self) -> None:
-        if self.list_view is not None:
-            self.set_focus(self.list_view)
+    def action_prev_commit(self) -> None:
+        if not self.commits:
+            return
+        new_index = max(0, self._current_index - 1)
+        self._select_index(new_index)
 
-    def action_focus_detail(self) -> None:
-        if self.detail_log is not None:
-            self.set_focus(self.detail_log)
+    def action_next_commit(self) -> None:
+        if not self.commits:
+            return
+        new_index = min(len(self.commits) - 1, self._current_index + 1)
+        self._select_index(new_index)
 
     def _show_commit(self, commit: GitCommit) -> None:
-        assert self.detail_log is not None
-        text = Text()
-        text.append(f"commit {commit.oid}\n", style="bold")
-        text.append(f"Author: {commit.author_name} <{commit.author_email}>\n")
-        text.append(f"Date:   {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        assert self.detail_view is not None
+        meta = Text()
+        meta.append(f"commit {commit.oid}\n", style="bold")
+        meta.append(f"Author: {commit.author_name} <{commit.author_email}>\n")
+        meta.append(f"Date:   {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         if commit.title:
-            text.append(f"{commit.title}\n\n", style="italic")
+            meta.append(f"{commit.title}\n\n", style="italic")
         if commit.body.strip():
-            for line in commit.body.splitlines():
-                text.append(line + "\n")
-            text.append("\n")
+            meta.append(commit.body.rstrip() + "\n\n")
         parent = commit.parent_oids[0] if commit.parent_oids else None
         diff = self.repo.get_diff(commit.oid, parent)
-        for line in diff.splitlines():
-            style = ""
-            if line.startswith("diff --git") or line.startswith("@@"):
-                style = "bold"
-            elif line.startswith("+"):
-                style = "bold green"
+        diff_table = self._build_diff_table(diff.splitlines())
+        self.detail_view.update(Group(meta, diff_table))
+        self.detail_view.scroll_home()
+
+    def _build_diff_table(self, lines: List[str]) -> Table:
+        table = Table(
+            show_header=True,
+            header_style="bold",
+            box=None,
+            expand=True,
+            pad_edge=False,
+        )
+        table.add_column("Removed", style="red", no_wrap=True)
+        table.add_column("Current", no_wrap=True)
+        table.add_column("Added", style="green", no_wrap=True)
+        for raw in lines:
+            line = raw.rstrip("\n")
+            if line.startswith("diff --git"):
+                table.add_row("", Text(line, style="cyan"), "")
+            elif line.startswith("@@"):
+                table.add_row("", Text(line, style="yellow"), "")
+            elif line.startswith("---"):
+                table.add_row(Text(line, style="red"), "", "")
+            elif line.startswith("+++"):
+                table.add_row("", Text(line, style="green"), "")
             elif line.startswith("-"):
-                style = "bold red"
-            text.append(line + "\n", style=style or None)
-        self.detail_log.clear()
-        self.detail_log.write(text)
+                content = line[1:]
+                table.add_row(Text(content, style="red"), "", "")
+            elif line.startswith("+"):
+                content = line[1:]
+                center = Text(content, style="green")
+                right = Text(content, style="green dim")
+                table.add_row("", center, right)
+            elif line.startswith("index"):
+                table.add_row(Text(line, style="magenta"), "", "")
+            else:
+                content = line[1:] if line.startswith(" ") else line
+                table.add_row("", Text(content), "")
+        return table
+
+    def _select_index(self, index: int) -> None:
+        if not self.commits:
+            return
+        index = max(0, min(len(self.commits) - 1, index))
+        commit = self.commits[index]
+        self._current_index = index
+        if self.list_view is not None:
+            if self.list_view.index != index:
+                self.list_view.index = index
+            self._scroll_list_to_index(index)
+        self._show_commit(commit)
+
+    def _scroll_list_to_index(self, index: int) -> None:
+        if self.list_view is None:
+            return
+        try:
+            self.list_view.scroll_to_index(index)
+        except AttributeError:
+            pass
 
 
 class HistoryTUI:
