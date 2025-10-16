@@ -10,6 +10,7 @@ Interactive [Textual](https://github.com/Textualize/textual)-based interface for
 - Page up/down, home/end shortcuts for faster navigation.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
 - Side-by-side diff visualization with deleted lines in red (left), context in the middle, and inserted lines in green (right).
+- Change files on the fly by pressing `F` and typing a new path.
 
 ## Installation
 
@@ -42,6 +43,7 @@ The path must point to a tracked file inside a git repository. Optional flags:
 Inside the interface:
 - `Left` / `Right`: move to the previous or next commit.
 - `Up` / `Down`: scroll the detail view.
+- `F`: load a different file (absolute path or relative to the directory you launched the app from).
 - `PgUp` `PgDn`: page navigation.
 - `Home` / `End` or `g` / `G`: jump to start/end of the list.
 - `q`: quit.

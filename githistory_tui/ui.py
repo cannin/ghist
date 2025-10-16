@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Iterable, List
 
 from rich.console import Group
@@ -7,8 +8,9 @@ from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container
-from textual.widgets import Footer, Header, RichLog
+from textual.containers import Container, Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Footer, Header, Input, RichLog, Static
 
 from .git_data import GitCommit, GitRepository
 
@@ -22,7 +24,66 @@ Screen {
     border: solid $surface 10%;
     padding: 0 1;
 }
+FilePromptScreen {
+    align: center middle;
+}
+FilePromptScreen #prompt-modal {
+    width: 60%;
+    max-width: 80;
+    padding: 1 2;
+    border: solid $accent 30%;
+    background: $surface;
+}
+FilePromptScreen .prompt-body {
+    layout: vertical;
+}
+FilePromptScreen .prompt-buttons {
+    layout: horizontal;
+    align-horizontal: right;
+}
 """
+
+
+class FilePromptScreen(ModalScreen[str | None]):
+    """Modal dialog allowing the user to pick a different file."""
+
+    def __init__(self, initial_path: str) -> None:
+        super().__init__()
+        self._initial_path = initial_path
+
+    def compose(self) -> ComposeResult:
+        with Container(id="prompt-modal"):
+            with Vertical(classes="prompt-body") as body:
+                body.styles.gap = 1
+                yield Static(
+                    "Enter a file path (absolute or relative):", classes="prompt-label"
+                )
+                file_input = Input(
+                    value=self._initial_path,
+                    placeholder="path/to/file",
+                    id="file-input",
+                )
+                file_input.styles.margin_top = 0  # gap handles spacing
+                yield file_input
+                with Horizontal(classes="prompt-buttons") as buttons:
+                    buttons.styles.align_horizontal = "right"
+                    buttons.styles.gap = 1
+                    buttons.styles.margin_top = 1
+                    yield Button("Cancel", id="cancel")
+                    yield Button("Load", id="confirm", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(None)
+        else:
+            value = self.query_one(Input).value.strip()
+            self.dismiss(value or None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip() or None)
 
 
 class _HistoryApp(App):
@@ -33,16 +94,25 @@ class _HistoryApp(App):
         Binding("q", "quit", "Quit"),
         Binding("left", "prev_commit", "Previous", key_display="←"),
         Binding("right", "next_commit", "Next", key_display="→"),
+        Binding("f", "prompt_file", "Change file", key_display="F"),
         Binding("tab", "focus_cycle", "Cycle focus", show=False),
     ]
 
     def __init__(
-        self, repo: GitRepository, commits: Iterable[GitCommit], file_path: str
+        self,
+        repo: GitRepository,
+        commits: Iterable[GitCommit],
+        file_path: str,
+        *,
+        launch_cwd: str,
+        limit: int,
     ) -> None:
         super().__init__()
         self.repo = repo
         self.commits: List[GitCommit] = list(commits)
         self.file_path = file_path
+        self.launch_cwd = launch_cwd
+        self.limit = limit
         self.detail_log: RichLog | None = None
         self._current_index = 0
         self.title = f"git history: {file_path}"
@@ -78,6 +148,9 @@ class _HistoryApp(App):
             return
         new_index = min(len(self.commits) - 1, self._current_index + 1)
         self._select_index(new_index)
+
+    def action_prompt_file(self) -> None:
+        self.push_screen(FilePromptScreen(self.file_path), self._handle_file_selection)
 
     def _show_commit(self, commit: GitCommit, index: int) -> None:
         assert self.detail_log is not None
@@ -144,14 +217,75 @@ class _HistoryApp(App):
         self._current_index = index
         self._show_commit(commit, index)
 
+    def _handle_file_selection(self, file_path: str | None) -> None:
+        if not file_path:
+            return
+        self._load_file(file_path)
+
+    def _load_file(self, raw_path: str) -> None:
+        try:
+            abs_path, rel_path = self._resolve_file_input(raw_path)
+        except ValueError as err:
+            self._show_status(str(err), severity="warning")
+            return
+        try:
+            commits = self.repo.list_file_commits(rel_path, limit=self.limit)
+        except Exception as err:
+            self._show_status(f"{err}", severity="error")
+            return
+        if not commits:
+            self._show_status(f"No commits found for {rel_path}", severity="warning")
+            return
+        self.commits = commits
+        self.file_path = rel_path
+        self.title = f"git history: {rel_path}"
+        self._current_index = 0
+        self._select_index(0)
+        self._show_status(f"Loaded {rel_path}", severity="information")
+
+    def _resolve_file_input(self, raw: str) -> tuple[str, str]:
+        path_str = raw.strip()
+        if not path_str:
+            raise ValueError("No file path provided.")
+        if os.path.isabs(path_str):
+            abs_path = os.path.abspath(path_str)
+        else:
+            abs_path = os.path.abspath(os.path.join(self.launch_cwd, path_str))
+        if not os.path.exists(abs_path):
+            raise ValueError(f"File does not exist: {abs_path}")
+        if os.path.isdir(abs_path):
+            raise ValueError("Path points to a directory; expected a file.")
+        try:
+            common = os.path.commonpath([self.repo.path, abs_path])
+        except ValueError:
+            common = ""
+        if common != self.repo.path:
+            raise ValueError(f"{abs_path} is outside repository {self.repo.path}")
+        rel_path = os.path.relpath(abs_path, self.repo.path).replace(os.sep, "/")
+        return abs_path, rel_path
+
+    def _show_status(self, message: str, *, severity: str = "information") -> None:
+        try:
+            self.notify(message, severity=severity)
+        except Exception:
+            pass
+
 
 class HistoryTUI:
     """Public interface mirroring the previous curses-based wrapper."""
 
     def __init__(
-        self, repo: GitRepository, commits: Iterable[GitCommit], file_path: str
+        self,
+        repo: GitRepository,
+        commits: Iterable[GitCommit],
+        file_path: str,
+        *,
+        launch_cwd: str,
+        limit: int,
     ) -> None:
-        self._app = _HistoryApp(repo, commits, file_path)
+        self._app = _HistoryApp(
+            repo, list(commits), file_path, launch_cwd=launch_cwd, limit=limit
+        )
 
     def run(self) -> None:
         self._app.run()

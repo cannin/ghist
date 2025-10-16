@@ -28,6 +28,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    launch_cwd = os.getcwd()
     args = parse_args(sys.argv[1:] if argv is None else argv)
     file_path = os.path.abspath(args.file)
     if not os.path.exists(file_path):
@@ -67,7 +68,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
     try:
-        tui = HistoryTUI(repo, commits, git_rel_path)
+        tui = HistoryTUI(
+            repo,
+            commits,
+            git_rel_path,
+            launch_cwd=launch_cwd,
+            limit=limit,
+        )
         tui.run()
     except KeyboardInterrupt:
         return 130
