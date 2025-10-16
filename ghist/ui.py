@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Iterable, List
 
 from rich.console import Group
+from rich.table import Table
 from rich.text import Text
 from textual import events
 from textual.app import App, ComposeResult
@@ -161,20 +162,23 @@ class _HistoryApp(App):
     def _show_commit(self, commit: GitCommit, index: int) -> None:
         assert self.detail_log is not None
         total = len(self.commits)
-        meta = Text()
-        meta.append(f"commit {commit.oid}\n", style="bold")
-        meta.append(f"Author: {commit.author_name} <{commit.author_email}>\n")
-        meta.append(f"Date:   {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        meta.append(f"File:   {self.file_path}\n")
-        meta.append(f"Show:   {total - index}/{total} commits\n")
-
-        message = Text()
-        message.append("\nMessage:\n", style="bold")
+        message = Text(justify="left")
         if commit.title:
             message.append(f"{commit.title}\n", style="italic")
         if commit.body.strip():
             message.append(commit.body.rstrip() + "\n")
-        message.append("\n")
+
+        info = Text(justify="left")
+        info.append(f"commit: {commit.oid}\n")
+        info.append(f"author: {commit.author_name} <{commit.author_email}>\n")
+        info.append(f"date: {commit.authored_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        info.append(f"file: {self.file_path}\n")
+        info.append(f"position: {total - index}/{total} commits")
+
+        header = Table.grid(expand=True)
+        header.add_column(ratio=3)
+        header.add_column(ratio=2)
+        header.add_row(info, message)
 
         (
             file_lines,
@@ -188,7 +192,7 @@ class _HistoryApp(App):
             file_lines, file_error, add_count, del_count, added_lines, removed_before
         )
         self.detail_log.clear()
-        self.detail_log.write(Group(meta, message, context))
+        self.detail_log.write(Group(header, Text("\n"), context))
         self.detail_log.scroll_home()
 
     def _prepare_context(
@@ -247,7 +251,16 @@ class _HistoryApp(App):
         removed_before: dict[int, List[tuple[int, str]]],
     ) -> Text:
         text = Text()
-        text.append(f"Edited {self.file_path} (+{add_count} -{del_count})\n", style="bold")
+        header = Text.assemble(
+            ("Edited ", ""),
+            (self.file_path, ""),
+            (" (", ""),
+            (f"+{add_count}", "green"),
+            (", ", ""),
+            (f"-{del_count}", "red"),
+            (")\n", ""),
+        )
+        text.append(header)
         text.append("\n")
         if file_error:
             text.append("Unable to load current file:\n", style="bold red")
