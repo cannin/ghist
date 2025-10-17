@@ -5,7 +5,7 @@ Interactive [Textual](https://github.com/Textualize/textual)-based interface for
 ## Features
 
 - Displays the commits that touched a given file with author and timestamp information.
-- Textual widgets with keyboard navigation: use `Left`/`Right` to step through commits and `Up`/`Down` to scroll the diff.
+- Textual widgets with keyboard navigation: use `left`/`right` to step through commits and `up`/`down` to scroll the diff.
 - View commit metadata, message body, and complete diff in the detail pane.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
 - Inline diff view with the full file visible: removed lines in red, additions in green.
@@ -44,8 +44,8 @@ The path must point to a tracked file inside a git repository. Optional flags:
 - `--limit`: number of commits to load (defaults to 256).
 
 Inside the interface:
-- `Left` / `Right`: move to the previous or next commit.
-- `Up` / `Down`: scroll the detail view.
+- `left` / `right`: move to the previous or next commit.
+- `up` / `down`: scroll the detail view.
 - `f`: load a different file (absolute path or relative to the directory you launched the app from).
 - `q`: quit.
 
