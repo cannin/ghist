@@ -9,7 +9,7 @@ Interactive [Textual](https://github.com/Textualize/textual)-based interface for
 - View commit metadata, message body, and complete diff in the detail pane.
 - No avatars, no animations — just a fast, keyboard-driven TUI.
 - Inline diff view with the full file visible: removed lines in red, additions in green.
-- Change files on the fly by pressing `F` and typing a new path.
+- Change files on the fly by pressing `f` and typing a new path.
 
 ## Installation
 
