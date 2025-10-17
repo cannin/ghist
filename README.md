@@ -19,12 +19,6 @@ Install a global `ghist` command with [`uv tool`](https://docs.astral.sh/uv/conc
 uv tool install ghist --from git+https://github.com/cannin/ghist.git
 ```
 
-Update later with:
-
-```bash
-uv tool upgrade ghist --from git+https://github.com/cannin/ghist.git
-```
-
 Uninstall with:
 
 ```bash
