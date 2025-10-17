@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
+from textwrap import wrap
 from typing import Iterable, List
 
 from rich.console import Group
@@ -118,6 +119,8 @@ class _HistoryApp(App):
         self.limit = limit
         self.detail_log: RichLog | None = None
         self._current_index = 0
+        self._header_widths: tuple[int, int] | None = None
+        self._header_height: int | None = None
         self.title = f"git history: {file_path}"
         self.sub_title = repo.path
 
@@ -137,6 +140,8 @@ class _HistoryApp(App):
         if not self.commits:
             self.detail_log.write(Text("No commits found.", style="italic"))
             return
+        self._header_widths = None
+        self._header_height = None
         self._select_index(0)
         self.call_after_refresh(self._refresh_current_commit)
         self.set_focus(self.detail_log)
@@ -157,6 +162,8 @@ class _HistoryApp(App):
         self.push_screen(FilePromptScreen(self.file_path), self._handle_file_selection)
 
     def on_resize(self, event: events.Resize) -> None:
+        self._header_widths = None
+        self._header_height = None
         self.call_after_refresh(self._refresh_current_commit)
 
     def _show_commit(self, commit: GitCommit, index: int) -> None:
@@ -175,9 +182,25 @@ class _HistoryApp(App):
         info.append(f"file: {self.file_path}\n")
         info.append(f"position: {total - index}/{total} commits")
 
-        header = Table.grid(expand=True)
-        header.add_column(ratio=3)
-        header.add_column(ratio=2)
+        left_width, right_width = self._compute_header_widths()
+        header_height = self._compute_header_height()
+        info = self._fit_text_height(info, header_height, left_width)
+        message = self._fit_text_height(message, header_height, right_width)
+        header = Table.grid(expand=False, pad_edge=False)
+        header.add_column(
+            width=left_width,
+            min_width=left_width,
+            max_width=left_width,
+            overflow="fold",
+            no_wrap=False,
+        )
+        header.add_column(
+            width=right_width,
+            min_width=right_width,
+            max_width=right_width,
+            overflow="fold",
+            no_wrap=False,
+        )
         header.add_row(info, message)
 
         (
@@ -282,6 +305,43 @@ class _HistoryApp(App):
                 text.append(f"{old_line:5d} -{removed_text}\n", style="red")
         return text
 
+    def _compute_header_widths(self) -> tuple[int, int]:
+        if self._header_widths and all(w > 0 for w in self._header_widths):
+            return self._header_widths
+        available = 0
+        if self.detail_log and self.detail_log.size.width > 0:
+            available = self.detail_log.size.width
+        elif self.screen and self.screen.size.width > 0:
+            available = self.screen.size.width
+        if available <= 0:
+            available = 120
+        usable = max(40, available - 4)
+        left = max(20, (usable * 3) // 5)
+        right = max(15, usable - left)
+        self._header_widths = (left, right)
+        return self._header_widths
+
+    def _compute_header_height(self) -> int:
+        if self._header_height and self._header_height > 0:
+            return self._header_height
+        self._header_height = 6
+        return self._header_height
+
+    def _fit_text_height(self, text: Text, height: int, width: int) -> Text:
+        raw_lines = text.plain.splitlines() or [""]
+        wrapped: List[str] = []
+        max_width = max(1, width - 1)
+        for line in raw_lines:
+            if not line:
+                wrapped.append("")
+                continue
+            wrapped.extend(wrap(line, max_width) or [""])
+        if len(wrapped) < height:
+            wrapped.extend([""] * (height - len(wrapped)))
+        else:
+            wrapped = wrapped[:height]
+        return Text("\n".join(wrapped), justify="left")
+
     def _refresh_current_commit(self) -> None:
         if not self.commits or self.detail_log is None:
             return
@@ -318,6 +378,7 @@ class _HistoryApp(App):
         self.file_path = rel_path
         self.title = f"git history: {rel_path}"
         self._current_index = 0
+        self._header_widths = None
         self._select_index(0)
         self._show_status(f"Loaded {rel_path}", severity="information")
 
