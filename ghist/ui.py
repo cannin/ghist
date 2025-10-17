@@ -13,8 +13,9 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Footer, Header, Input, RichLog, Static
+from textual.widgets import Button, Header, Input, RichLog, Static
 
+from . import __version__
 from .git_data import GitCommit, GitRepository, GitError
 
 
@@ -44,6 +45,12 @@ FilePromptScreen .prompt-body {
 FilePromptScreen .prompt-buttons {
     layout: horizontal;
     align-horizontal: right;
+}
+#version-footer {
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    color: $text;
 }
 """
 
@@ -90,6 +97,18 @@ class FilePromptScreen(ModalScreen[str | None]):
         self.dismiss(event.value.strip() or None)
 
 
+class VersionFooter(Static):
+    """Footer displaying version information and key hints."""
+
+    def __init__(self, version: str) -> None:
+        super().__init__(id="version-footer")
+        self._version = version
+
+    def on_mount(self) -> None:
+        help_text = "← older  → newer  f select file  q quit"
+        self.update(f"ghist {self._version}  •  {help_text}")
+
+
 class _HistoryApp(App):
     """Textual application presenting git history for a single file."""
 
@@ -133,7 +152,7 @@ class _HistoryApp(App):
         )
         yield Header(show_clock=False)
         yield Container(self.detail_log, id="detail-panel")
-        yield Footer()
+        yield VersionFooter(__version__)
 
     def on_mount(self) -> None:
         assert self.detail_log is not None
@@ -169,11 +188,13 @@ class _HistoryApp(App):
     def _show_commit(self, commit: GitCommit, index: int) -> None:
         assert self.detail_log is not None
         total = len(self.commits)
-        message = Text(justify="left")
+        message_parts: List[str] = []
         if commit.title:
-            message.append(f"{commit.title}\n", style="italic")
+            message_parts.append(commit.title)
         if commit.body.strip():
-            message.append(commit.body.rstrip() + "\n")
+            message_parts.extend(commit.body.rstrip().splitlines())
+        message_text = "\n".join(message_parts)
+        message = Text(message_text, justify="left")
 
         info = Text(justify="left")
         info.append(f"commit: {commit.oid}\n")
@@ -185,7 +206,12 @@ class _HistoryApp(App):
         left_width, right_width = self._compute_header_widths()
         header_height = self._compute_header_height()
         info = self._fit_text_height(info, header_height, left_width)
-        message = self._fit_text_height(message, header_height, right_width)
+        message = self._fit_text_height(
+            message,
+            header_height,
+            right_width,
+            first_line_style="italic" if commit.title else None,
+        )
         header = Table.grid(expand=False, pad_edge=False)
         header.add_column(
             width=left_width,
@@ -327,20 +353,40 @@ class _HistoryApp(App):
         self._header_height = 6
         return self._header_height
 
-    def _fit_text_height(self, text: Text, height: int, width: int) -> Text:
+    def _fit_text_height(
+        self, text: Text, height: int, width: int, first_line_style: str | None = None
+    ) -> Text:
         raw_lines = text.plain.splitlines() or [""]
-        wrapped: List[str] = []
         max_width = max(1, width - 1)
+        wrapped: List[tuple[str, str | None]] = []
+        first_line_styled = False
         for line in raw_lines:
-            if not line:
-                wrapped.append("")
-                continue
-            wrapped.extend(wrap(line, max_width) or [""])
+            segments = wrap(line, max_width) or [""]
+            for segment in segments:
+                segment_style: str | None = None
+                if (
+                    first_line_style
+                    and not first_line_styled
+                    and segment.strip()
+                ):
+                    segment_style = first_line_style
+                    first_line_styled = True
+                wrapped.append((segment, segment_style))
+            if not segments:
+                wrapped.append(("", None))
         if len(wrapped) < height:
-            wrapped.extend([""] * (height - len(wrapped)))
+            wrapped.extend([("", None)] * (height - len(wrapped)))
         else:
             wrapped = wrapped[:height]
-        return Text("\n".join(wrapped), justify="left")
+        result = Text(justify="left")
+        for idx, (segment, segment_style) in enumerate(wrapped):
+            if idx:
+                result.append("\n")
+            if segment_style:
+                result.append(segment, style=segment_style)
+            else:
+                result.append(segment)
+        return result
 
     def _refresh_current_commit(self) -> None:
         if not self.commits or self.detail_log is None:
@@ -379,6 +425,7 @@ class _HistoryApp(App):
         self.title = f"git history: {rel_path}"
         self._current_index = 0
         self._header_widths = None
+        self._header_height = None
         self._select_index(0)
         self._show_status(f"Loaded {rel_path}", severity="information")
 

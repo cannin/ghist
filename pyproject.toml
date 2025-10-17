@@ -1,10 +1,10 @@
 [project]
 name = "ghist"
-version = "0.3.3"
+version = "0.4.1"
 description = "A Textual-based terminal UI for browsing git history."
 authors = [{name = "pomber remake contributors"}]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = ["textual>=0.44"]
 
 [build-system]
